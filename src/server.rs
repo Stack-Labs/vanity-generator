@@ -37,6 +37,7 @@ struct ErrorResponse {
 
 async fn health_check() -> impl IntoResponse {
     tracing::info!("Health check request received");
+    tracing::debug!("Processing health check request");
     (
         StatusCode::OK,
         [
@@ -100,7 +101,8 @@ async fn generate_vanity_address(
     State(state): State<Arc<AppState>>,
     Json(req): Json<GenerateRequest>,
 ) -> Result<Json<GenerateResponse>, Json<ErrorResponse>> {
-    tracing::info!("Received vanity address generation request for base: {}", req.base);
+    tracing::info!("Received vanity address generation request");
+    tracing::debug!("Request details - base address: {}", req.base);
     
     // Validate base address
     if let Err(_) = Pubkey::try_from(req.base.as_str()) {
@@ -109,6 +111,7 @@ async fn generate_vanity_address(
             error: "Invalid base address".to_string(),
         }));
     }
+    tracing::debug!("Base address validation successful");
 
     // Create GrindArgs for the vanity generator
     let args = GrindArgs {
@@ -120,11 +123,14 @@ async fn generate_vanity_address(
         logfile: None,
         num_cpus: 0,
     };
+    tracing::debug!("GrindArgs configured with suffix: Loop");
 
     // Run the grind function
+    tracing::info!("Starting vanity address generation");
     let (seed, address) = grind_with_result(args);
-
     tracing::info!("Successfully generated vanity address: {}", address);
+    tracing::debug!("Generation completed with seed: {}", seed);
+
     Ok(Json(GenerateResponse {
         address: address.to_string(),
         seed,
@@ -132,13 +138,21 @@ async fn generate_vanity_address(
 }
 
 pub async fn start_server() {
-    // Initialize tracing
-    tracing_subscriber::fmt::init();
+    // Initialize tracing with more detailed format
+    tracing_subscriber::fmt()
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_file(true)
+        .with_line_number(true)
+        .init();
 
+    tracing::info!("Initializing server...");
+    
     // Create app state
     let state = Arc::new(AppState {
         token_program_id: Pubkey::try_from("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA").unwrap(),
     });
+    tracing::info!("App state initialized with token program ID");
 
     // Build router
     let app = Router::new()
@@ -151,17 +165,20 @@ pub async fn start_server() {
                 .allow_methods(tower_http::cors::Any)
                 .allow_headers(tower_http::cors::Any),
         );
+    tracing::info!("Router configured with health check and generate endpoints");
 
     // Run server with HTTP/1.1
     let addr = "0.0.0.0:3001";
+    tracing::info!("Attempting to bind to address: {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    tracing::info!("Server starting on {}", addr);
-    tracing::info!("Ready to accept connections");
+    tracing::info!("Successfully bound to {}", addr);
+    tracing::info!("Server is ready to accept connections");
     
     axum::serve(listener, app.into_make_service())
         .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
+    tracing::info!("Server shutdown complete");
 }
 
 async fn shutdown_signal() {
