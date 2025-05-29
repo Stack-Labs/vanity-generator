@@ -3,6 +3,8 @@ use axum::{
     Router,
     Json,
     extract::State,
+    response::IntoResponse,
+    http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
@@ -33,9 +35,13 @@ struct ErrorResponse {
     error: String,
 }
 
-async fn health_check() -> &'static str {
+async fn health_check() -> impl IntoResponse {
     tracing::info!("Health check request received");
-    "ok"
+    (
+        StatusCode::OK,
+        [("content-type", "text/plain")],
+        "ok"
+    )
 }
 
 fn grind_with_result(args: GrindArgs) -> (String, Pubkey) {
