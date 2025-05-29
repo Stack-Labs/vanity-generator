@@ -1,26 +1,24 @@
-FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
+# Use the official Rust image as a builder
+FROM rust:1.75 as builder
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    build-essential \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-# Copy the project
-WORKDIR /app
+# Create a new empty shell project
+WORKDIR /usr/src/app
 COPY . .
 
-# Build the project with GPU support
-RUN cargo build --release --features gpu
+# Build the application
+RUN cargo build --release
 
-# Expose port
+# Create a new stage with a minimal image
+FROM debian:bullseye-slim
+
+# Install necessary runtime dependencies
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Copy the binary from builder
+COPY --from=builder /usr/src/app/target/release/vanity /usr/local/bin/vanity
+
+# Expose the port the app runs on
 EXPOSE 3001
 
-# Start server
-CMD ["./target/release/vanity", "server"]
+# Run the binary
+CMD ["vanity"]

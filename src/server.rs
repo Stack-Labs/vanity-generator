@@ -34,10 +34,12 @@ struct ErrorResponse {
 }
 
 async fn health_check() -> &'static str {
+    tracing::info!("Health check request received");
     "ok"
 }
 
 fn grind_with_result(args: GrindArgs) -> (String, Pubkey) {
+    tracing::info!("Starting vanity address generation");
     let mut seed = [0u8; 16];
     let mut found = false;
     let mut address = Pubkey::default();
@@ -75,6 +77,13 @@ fn grind_with_result(args: GrindArgs) -> (String, Pubkey) {
         }
     }
 
+    let duration = timer.elapsed();
+    tracing::info!(
+        "Vanity address generated in {:?} after {} attempts",
+        duration,
+        count
+    );
+    
     (std::str::from_utf8(&seed).unwrap().to_string(), address)
 }
 
@@ -82,17 +91,19 @@ async fn generate_vanity_address(
     State(state): State<Arc<AppState>>,
     Json(req): Json<GenerateRequest>,
 ) -> Result<Json<GenerateResponse>, Json<ErrorResponse>> {
+    tracing::info!("Received vanity address generation request for base: {}", req.base);
+    
     // Validate base address
-    let base = match Pubkey::try_from(req.base.as_str()) {
-        Ok(pubkey) => pubkey,
-        Err(_) => return Err(Json(ErrorResponse {
+    if let Err(_) = Pubkey::try_from(req.base.as_str()) {
+        tracing::error!("Invalid base address provided: {}", req.base);
+        return Err(Json(ErrorResponse {
             error: "Invalid base address".to_string(),
-        })),
-    };
+        }));
+    }
 
     // Create GrindArgs for the vanity generator
     let args = GrindArgs {
-        base,
+        base: Pubkey::try_from(req.base.as_str()).unwrap(),
         owner: state.token_program_id,
         prefix: None,
         suffix: Some("Loop".to_string()),
@@ -104,6 +115,7 @@ async fn generate_vanity_address(
     // Run the grind function
     let (seed, address) = grind_with_result(args);
 
+    tracing::info!("Successfully generated vanity address: {}", address);
     Ok(Json(GenerateResponse {
         address: address.to_string(),
         seed,
@@ -134,6 +146,7 @@ pub async fn start_server() {
     // Run server
     let addr = "0.0.0.0:3001";
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    tracing::info!("listening on {}", addr);
+    tracing::info!("Server starting on {}", addr);
+    tracing::info!("Ready to accept connections");
     axum::serve(listener, app.into_make_service()).await.unwrap();
 }
