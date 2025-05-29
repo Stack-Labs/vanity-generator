@@ -39,7 +39,10 @@ async fn health_check() -> impl IntoResponse {
     tracing::info!("Health check request received");
     (
         StatusCode::OK,
-        [("content-type", "text/plain")],
+        [
+            ("content-type", "text/plain"),
+            ("connection", "close"),
+        ],
         "ok"
     )
 }
