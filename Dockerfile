@@ -20,5 +20,5 @@ COPY --from=builder /usr/src/app/target/release/vanity /usr/local/bin/vanity
 # Expose the port the app runs on
 EXPOSE 3001
 
-# Run the binary
-CMD ["vanity"]
+# Run the binary with the server command
+CMD ["vanity", "server"]
