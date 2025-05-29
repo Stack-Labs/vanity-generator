@@ -152,10 +152,20 @@ pub async fn start_server() {
                 .allow_headers(tower_http::cors::Any),
         );
 
-    // Run server
+    // Run server with HTTP/1.1
     let addr = "0.0.0.0:3001";
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     tracing::info!("Server starting on {}", addr);
     tracing::info!("Ready to accept connections");
-    axum::serve(listener, app.into_make_service()).await.unwrap();
+    
+    axum::serve(listener, app.into_make_service())
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .unwrap();
+}
+
+async fn shutdown_signal() {
+    tokio::signal::ctrl_c()
+        .await
+        .expect("Failed to install CTRL+C signal handler");
 }
