@@ -8,8 +8,8 @@ COPY . .
 # Build the application
 RUN cargo build --release
 
-# Create a new stage with a minimal image
-FROM debian:bullseye-slim
+# Create a new stage with a newer base image
+FROM ubuntu:22.04
 
 # Install necessary runtime dependencies
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
